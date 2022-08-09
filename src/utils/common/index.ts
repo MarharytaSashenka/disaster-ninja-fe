@@ -17,4 +17,13 @@ const sortByKey =
     return 0;
   };
 
-export { capitalize, joinAndCapitalizeItems, sortByKey };
+interface ObjectWithMessageProperty {
+  message: string;
+  [key: string]: any;
+}
+
+const isErrorWithMessage = (e: unknown): e is ObjectWithMessageProperty => {
+  return e !== null && typeof e === 'object' && 'message' in e;
+};
+
+export { capitalize, joinAndCapitalizeItems, sortByKey, isErrorWithMessage };
