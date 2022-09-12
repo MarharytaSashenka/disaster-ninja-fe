@@ -1,4 +1,6 @@
-import { forwardRef, memo, useCallback, useEffect, useMemo } from 'react';
+import { forwardRef, memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useAction } from '@reatom/react';
+import { bivariateMatrixSelectionAtom } from '~features/bivariate_manager/atoms/bivariateMatrixSelection';
 import {
   calculateHeadingsStyle,
   generateCellStyles,
@@ -51,6 +53,10 @@ const BivariateMatrixControl = forwardRef<HTMLDivElement | null, any>(
     let hoveredRowIndex = -1;
     let selectedColIndex = selectedCell?.x ?? -1;
     let selectedRowIndex = selectedCell?.y ?? -1;
+
+    const setSelectCellCallback = useAction(
+      bivariateMatrixSelectionAtom.setSelectCellCallback,
+    );
 
     const setCellReference = (ref, rowIndex, colIndex) => {
       if (rowIndex >= 0) {
@@ -130,12 +136,12 @@ const BivariateMatrixControl = forwardRef<HTMLDivElement | null, any>(
       }
     };
 
-    const onSelect = (x: number, y: number, e?: MouseEvent<Element>) => {
+    const onResetSelected = () => {
       if (selectedColIndex !== -1) {
         const columns = cellColumnReferences[selectedColIndex];
         if (columns) {
           columns.forEach((clmn) => {
-            clmn.resetSelectedCol();
+            clmn?.resetSelectedCol();
           });
         }
         selectedColIndex = -1;
@@ -145,18 +151,35 @@ const BivariateMatrixControl = forwardRef<HTMLDivElement | null, any>(
         const rows = cellRowReferences[selectedRowIndex];
         if (rows) {
           rows.forEach((rw) => {
-            rw.resetSelectedRow();
+            rw?.resetSelectedRow();
           });
         }
         selectedRowIndex = -1;
       }
+    };
+
+    // onInnerSelect is triggered only when clicking by mouse on matrix elements
+    const onInnerSelect = (x: number, y: number, e?: MouseEvent<Element>) => {
+      onResetSelected();
+      onSelectRowCol(x, y);
+      onSelectCell(x, y, e);
+    };
+
+    // onOuterSelect is triggered only when you select overlay and we need to preselect layers in matrix
+    const onOuterSelect = (x: number, y: number) => {
+      onResetSelected();
+      onSelectRowCol(x, y);
+    };
+
+    const onSelectRowCol = (x: number, y: number) => {
+      if (x === -1 || y === -1) return;
 
       if (x !== -1 && selectedColIndex !== x) {
         selectedColIndex = x;
         const columns = cellColumnReferences[selectedColIndex];
         if (columns) {
           columns.forEach((clmn) => {
-            clmn.setSelectedCol();
+            clmn?.setSelectedCol();
           });
         }
       }
@@ -166,20 +189,20 @@ const BivariateMatrixControl = forwardRef<HTMLDivElement | null, any>(
         const rows = cellRowReferences[selectedRowIndex];
         if (rows) {
           rows.forEach((rw) => {
-            rw.setSelectedRow();
+            rw?.setSelectedRow();
           });
         }
       }
-
-      onSelectCell(x, y, e);
     };
 
+    setSelectCellCallback(onOuterSelect.bind(this));
+
     const onCellSelectX = (cellIndex: number, e: MouseEvent<Element>) => {
-      onSelect(cellIndex, selectedRowIndex, e);
+      onInnerSelect(cellIndex, selectedRowIndex, e);
     };
 
     const onCellSelectY = (cellIndex: number, e: MouseEvent<Element>) => {
-      onSelect(selectedColIndex, cellIndex, e);
+      onInnerSelect(selectedColIndex, cellIndex, e);
     };
 
     const selectQuotientX = useCallback(
@@ -208,7 +231,7 @@ const BivariateMatrixControl = forwardRef<HTMLDivElement | null, any>(
 
     useEffect(() => {
       if (selectedCell && (selectedCell.x !== -1 || selectedCell.y !== -1)) {
-        onSelect(selectedCell.x, selectedCell.y);
+        onInnerSelect(selectedCell.x, selectedCell.y);
       }
     }, [matrix]);
 
@@ -239,7 +262,7 @@ const BivariateMatrixControl = forwardRef<HTMLDivElement | null, any>(
                   x={colIndex}
                   y={rowIndex}
                   key={`matrix_cell_${colIndex}_${rowIndex}`}
-                  onClick={onSelect}
+                  onClick={onInnerSelect}
                   onMouseOver={onMouseOver}
                   onMouseOut={onMouseOut}
                   style={
@@ -299,7 +322,6 @@ const BivariateMatrixControl = forwardRef<HTMLDivElement | null, any>(
 
 BivariateMatrixControl.displayName = 'BivariateMatrixControl';
 
-// eslint-disable-next-line react/display-name
 export const BivariateMatrixControlComponent = memo(
   BivariateMatrixControl,
   (oldProps, newProps) => oldProps.matrix === newProps.matrix,
